@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f4a3a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Commenda">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Commenda: Delve &amp; Dividend</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --baize:#2f4a3a; --baize-deep:#24392d;
+  --paper:#ece5d2; --paper-2:#e0d6bd;
+  --ink:#2b2118; --ink-soft:#6b5a45;
+  --rubric:#9e2b1b; --gilt:#8a6216; --line:#c9ba98; --ok:#356246;
+  --seal:#8f2316; --seal-hi:#b8402c;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --baize:#121c16; --baize-deep:#0d1510;
+    --paper:#24221c; --paper-2:#2d2a22;
+    --ink:#e6dcc5; --ink-soft:#a8997e;
+    --rubric:#e0715b; --gilt:#d4aa4e; --line:#474033; --ok:#86b894;
+    --seal:#7a2014; --seal-hi:#a23a27;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--baize);
+  background-image:radial-gradient(circle at 30% 20%,rgba(255,255,255,.04),transparent 60%);
+  color:var(--ink);
+  font-family:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho","YuMincho",serif;
+  font-size:16px; line-height:1.75;
+  font-variant-numeric:tabular-nums;
+  -webkit-text-size-adjust:100%;
+  min-height:100vh;
+}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gilt);outline-offset:2px}
+
+/* 上部の帳場札 */
+.top{
+  position:sticky; top:0; z-index:20;
+  background:var(--baize-deep);
+  color:#efe6cf;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 10px;
+  display:grid; grid-template-columns:auto 1fr; gap:2px 14px; align-items:baseline;
+  border-bottom:1px solid rgba(0,0,0,.35);
+}
+.top .day{font-size:15px}
+.top .day b{font-size:26px;font-weight:800;margin:0 2px}
+.top .purse{justify-self:end;font-size:15px}
+.top .purse b{font-size:22px;font-weight:600;margin:0 3px;color:#e8c46a}
+.top .due{grid-column:1/-1;font-size:13px;opacity:.85}
+.top .due.warn{color:#f19b86;opacity:1;font-weight:600}
+.top .due.paid{color:#9fd2ae}
+
+main{max-width:560px;margin:0 auto;padding:14px 12px calc(96px + env(safe-area-inset-bottom,0px))}
+
+/* 帳面 */
+.sheet{
+  position:relative;
+  background:var(--paper);
+  border-radius:2px;
+  padding:14px 16px 14px 30px;
+  margin-bottom:14px;
+  box-shadow:0 1px 0 rgba(0,0,0,.3),0 6px 14px -8px rgba(0,0,0,.5);
+}
+.sheet::before{content:"";position:absolute;left:18px;top:0;bottom:0;border-left:1px solid var(--rubric);opacity:.55}
+.sheet h2{margin:0 0 8px;font-size:15px;font-weight:800;color:var(--rubric);letter-spacing:.06em}
+.sheet p{margin:0 0 6px}
+.muted{color:var(--ink-soft);font-size:14px}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.num{font-weight:600}
+.plus{color:var(--ok)} .minus{color:var(--rubric)}
+
+/* 釦 */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-height:40px;padding:6px 14px;
+  border:1px solid var(--ink);border-radius:3px;
+  background:transparent;cursor:pointer;font-size:15px;
+}
+.btn.solid{background:var(--ink);color:var(--paper)}
+.btn.small{min-height:34px;padding:3px 10px;font-size:14px}
+.btn:disabled{opacity:.38;cursor:default}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+
+/* 申し出 */
+.offer{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+.offer:first-of-type{border-top:0;margin-top:0;padding-top:0}
+.offer .who{font-weight:800;font-size:17px}
+.offer .goods{margin:4px 0;font-size:15px}
+.offer .price{display:flex;gap:16px;flex-wrap:wrap;font-size:15px}
+.offer .price b{font-size:18px}
+
+/* 冒険者 */
+.adv{padding:10px 0;border-bottom:1px solid var(--line)}
+.adv:last-child{border-bottom:0}
+.adv .head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.adv .name{font-weight:800;font-size:17px}
+.adv .trait{font-size:14px;color:var(--ink-soft)}
+.pips{letter-spacing:2px;color:var(--gilt);font-size:13px}
+.tag{display:inline-block;font-size:13px;border:1px solid currentColor;border-radius:2px;padding:0 6px;margin-left:6px}
+.tag.red{color:var(--rubric)} .tag.away{color:var(--ink-soft)}
+
+/* 相場表 */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th{font-weight:600;text-align:left;color:var(--ink-soft);font-size:13px;padding:4px 4px 6px;border-bottom:1px solid var(--ink)}
+td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.r,th.r{text-align:right}
+.up{color:var(--ok);font-size:12px} .down{color:var(--rubric);font-size:12px}
+.sellbtns{display:flex;gap:6px;justify-content:flex-end}
+
+/* 冒険記 */
+.report .title{font-weight:800}
+.report .lines p{margin:0 0 4px;text-indent:1em}
+.report .loot{margin-top:6px;font-size:14px;color:var(--ink-soft)}
+
+/* 封蝋 */
+.seal-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;margin:22px 0 8px}
+.seal{
+  width:112px;height:112px;border-radius:50%;border:0;cursor:pointer;
+  background:radial-gradient(circle at 35% 30%,var(--seal-hi),var(--seal) 62%);
+  color:#f6e2d4;font-weight:800;font-size:19px;letter-spacing:.12em;line-height:1.3;
+  box-shadow:inset 0 0 0 6px rgba(0,0,0,.18),inset 0 0 0 8px rgba(255,255,255,.08),0 4px 10px rgba(0,0,0,.45);
+  transition:transform .12s ease;
+}
+.seal:active{transform:scale(.95)}
+.seal-wrap .muted{color:#d8ceb6;font-size:13px}
+
+/* 下部の見出し */
+nav.tabs{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;
+  background:var(--paper-2);border-top:1px solid var(--line);
+  display:grid;grid-template-columns:repeat(5,1fr);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+nav.tabs button{
+  background:none;border:0;padding:12px 2px 10px;font-size:13px;cursor:pointer;position:relative;color:var(--ink-soft)
+}
+nav.tabs button[aria-current="page"]{color:var(--ink);font-weight:800}
+nav.tabs button[aria-current="page"]::after{content:"";position:absolute;left:28%;right:28%;top:0;border-top:3px solid var(--rubric)}
+.badge{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:9px;background:var(--rubric);color:#fff;font-size:11px;margin-left:3px;padding:0 4px;vertical-align:1px}
+
+/* 知らせ */
+#toast{
+  position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
+  background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:3px;font-size:14px;
+  max-width:88vw;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50
+}
+#toast.show{opacity:1}
+
+/* 終幕 */
+.overlay{position:fixed;inset:0;z-index:60;background:rgba(10,16,12,.78);display:flex;align-items:center;justify-content:center;padding:20px}
+.overlay .sheet{max-width:420px;width:100%}
+.overlay h2{font-size:20px}
+
+textarea{width:100%;min-height:90px;font:13px/1.5 ui-monospace,Menlo,monospace;background:var(--paper-2);color:var(--ink);border:1px solid var(--line);border-radius:2px;padding:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top" id="top"></header>
+<main id="main"></main>
+<nav class="tabs" id="tabs" aria-label="画面の切り替え"></nav>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="overlay"></div>
+
+<script>
+'use strict';
+const VERSION = 'v0.1.0';
+const SAVE_KEY = 'commenda-save';
+
+/* ===== 調整用の数値（遊び心地を見ながらここを変える） ===== */
+const CONFIG = {
+  startGold: 400,        // 開始時の所持金
+  debtAmount: 1000,      // 借金の額
+  debtDue: 20,           // 返済期日（この日の終わりまで）
+  tavernStart: 6,        // 開始時に酒場にいる冒険者の数
+  tavernMax: 8,          // 街にいる冒険者の上限
+  arrivalEvery: 3,       // 何日ごとに新しい冒険者が来るか
+  advanceBase: 15,       // 前金の基本額
+  advancePerSkill: 10,   // 腕前1段ごとの前金の上乗せ
+  injuryBase: 0.10,      // 負傷の基本確率
+  priceImpact: 0.02,     // 1つ売るごとの値下がり率
+  meanRevert: 0.30,      // 相場が基準値へ戻ろうとする強さ
+  noise: 0.08,           // 相場の日々のゆらぎ
+  rumorChance: 0.22,     // 一日に噂が立つ確率
+  haggleCut: 0.8         // 値切りに成功したときの価格倍率
+};
+
+const DUNGEON = '灰鉄の坑道';
+
+const ITEMS = {
+  iron:    {name:'鉄鉱石',     base:12, w:30, qty:[2,5]},
+  copper:  {name:'銅鉱石',     base:18, w:22, qty:[2,4]},
+  coal:    {name:'石炭',       base:8,  w:28, qty:[3,6]},
+  crystal: {name:'水晶片',     base:34, w:10, qty:[1,2]},
+  dagger:  {name:'錆びた短剣', base:26, w:8,  qty:[1,1]},
+  coin:    {name:'古銭',       base:30, w:7,  qty:[1,3]},
+  ring:    {name:'銀の指輪',   base:75, w:3,  qty:[1,1]}
+};
+
+const TRAITS = {
+  '強欲': {loot:1.30, injury: 0.08, ask:0.52, haggle:0.25, adv:10, desc:'取り分にうるさいが、よく掘る'},
+  '豪胆': {loot:1.15, injury: 0.06, ask:0.47, haggle:0.40, adv:5,  desc:'危ない区画にも踏み込む'},
+  '正直': {loot:1.00, injury: 0.00, ask:0.40, haggle:0.50, adv:0,  desc:'値付けが素直'},
+  '慎重': {loot:0.85, injury:-0.06, ask:0.44, haggle:0.45, adv:0,  desc:'稼ぎは控えめだが怪我が少ない'},
+  '臆病': {loot:0.75, injury:-0.09, ask:0.42, haggle:0.60, adv:-5, desc:'すぐ引き返すが、押しに弱い'}
+};
+
+const NAMES = ['ガルド','ベルタ','オスリック','マティルダ','ヨハン','リーゼル','コンラート','ヘドヴィグ','ウルリヒ','エルザ','ティボー','イゾルデ','ロタール','グレーテ','ベネディクト','アグネス','ディートリヒ','ミリアム','ファルク','ジルケ','ルトガー','ウタ','アルノー','クニグンデ'];
+
+const RUMOR_UP = [
+  '鍛冶屋組合が{i}を買い集めているらしい。',
+  '魔術師ギルドが{i}を求めているそうだ。',
+  '港に着いた外国船が{i}の買い手を探している。',
+  '{i}の値が少しずつ上がり始めている。'
+];
+const RUMOR_DOWN = [
+  '隣町から{i}が大量に運び込まれた。',
+  '{i}が市場にだぶついているという。',
+  '{i}を買っていた大口の客が手を引いたらしい。'
+];
+
+const KANJI = ['〇','一','二','三','四','五','六','七','八','九','十'];
+
+/* ===== 道具 ===== */
+const rand = (a,b) => a + Math.floor(Math.random()*(b-a+1));
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+function gauss(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const price = k => Math.max(1, Math.round(S.market[k].price));
+const adv = id => S.adventurers.find(a => a.id === id);
+const itemsText = items => Object.entries(items).map(([k,q]) => `${ITEMS[k].name}×${q}`).join('、');
+const pips = (n, max=5) => '●'.repeat(n) + '○'.repeat(Math.max(0,max-n));
+
+/* ===== 状態 ===== */
+let S = null;
+let UI = {tab:'home', showCode:false};
+
+function planFor(a){
+  a.plan = {days: rand(2,3), advance: Math.max(5, CONFIG.advanceBase + a.skill*CONFIG.advancePerSkill + TRAITS[a.trait].adv)};
+}
+function newAdventurer(){
+  const used = new Set(S.adventurers.map(a => a.name));
+  const free = NAMES.filter(n => !used.has(n));
+  const name = free.length ? pick(free) : pick(NAMES) + '二世';
+  const a = {id:S.nextId++, name, skill:pick([1,2,2,3,3,3,4,4,5]), trait:pick(Object.keys(TRAITS)), trust:3, status:'idle', restUntil:0, trips:0};
+  planFor(a);
+  return a;
+}
+function newGame(){
+  S = {
+    ver:1, day:1, gold:CONFIG.startGold,
+    debt:{amount:CONFIG.debtAmount, due:CONFIG.debtDue, paid:false},
+    adventurers:[], expeditions:[], offers:[], inventory:{}, market:{}, rumors:[], reports:[], ledger:[],
+    over:null, freePlay:false, nextId:1, stats:{trips:0, bought:0, sold:0}
+  };
+  for (const k in ITEMS){
+    const p = ITEMS[k].base * (0.85 + Math.random()*0.3);
+    S.market[k] = {price:p, prev:p, mod:1, modUntil:0};
+    S.inventory[k] = 0;
+  }
+  for (let i=0;i<CONFIG.tavernStart;i++) S.adventurers.push(newAdventurer());
+  log('借入金を元手に帳場を開いた。', 0);
+}
+function log(text, v){ S.ledger.push({text, v}); }
+
+/* ===== 保存 ===== */
+function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
+function load(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return false;
+    const o = JSON.parse(raw);
+    if (!o || o.ver !== 1) return false;
+    S = o; return true;
+  }catch(e){ return false; }
+}
+function exportCode(){ return btoa(unescape(encodeURIComponent(JSON.stringify(S)))); }
+function importText(text){
+  const t = text.trim();
+  const o = t.startsWith('{') ? JSON.parse(t) : JSON.parse(decodeURIComponent(escape(atob(t))));
+  if (!o || o.ver !== 1 || !o.market || !o.adventurers) throw new Error('bad');
+  S = o; save(); render();
+}
+
+/* ===== 相場 ===== */
+function updateMarket(){
+  for (const k in ITEMS){
+    const m = S.market[k], base = ITEMS[k].base;
+    if (m.modUntil && S.day > m.modUntil){ m.mod = 1; m.modUntil = 0; }
+    m.prev = m.price;
+    m.price += (base*m.mod - m.price)*CONFIG.meanRevert + base*CONFIG.noise*gauss();
+    m.price = clamp(m.price, base*0.35, base*2.5);
+  }
+}
+function maybeRumor(){
+  S.rumors = S.rumors.filter(r => r.until >= S.day);
+  if (Math.random() >= CONFIG.rumorChance) return;
+  const k = pick(Object.keys(ITEMS)), m = S.market[k];
+  if (m.modUntil) return;
+  const up = Math.random() < 0.6, dur = rand(3,5);
+  m.mod = up ? 1.6 : 0.6; m.modUntil = S.day + dur;
+  S.rumors.push({day:S.day, until:S.day+dur, text:pick(up?RUMOR_UP:RUMOR_DOWN).replace('{i}', ITEMS[k].name)});
+}
+
+/* ===== 遠征 ===== */
+function weightedItem(){
+  const keys = Object.keys(ITEMS);
+  let r = Math.random()*keys.reduce((s,k)=>s+ITEMS[k].w,0);
+  for (const k of keys){ r -= ITEMS[k].w; if (r <= 0) return k; }
+  return keys[0];
+}
+function genReport(a, days, injured, rest, items){
+  const n = a.name, L = [];
+  const pool = [
+    `${n}は坑道ネズミの群れを松明で追い払った。`,
+    `崩れた支柱の奥に、手つかずの鉱脈が鈍く光っていた。`,
+    `水の溜まった区画を、${n}は腰まで浸かって渡った。`,
+    `古い坑夫の野営跡に、誰かの忘れ物が残されていた。`,
+    `岩トカゲと鉢合わせ、${n}は短剣を振るって追い返した。`,
+    `遠くで落石の音が響き、${n}はしばらく息を潜めた。`,
+    `湿った岩壁にもたれ、${n}は乾いたパンをかじった。`
+  ];
+  const flavor = {
+    '強欲':`「まだ掘れる」と言い張り、松明が尽きかけるまで粘った。`,
+    '豪胆':`崩れかけた横穴へも、ためらわず踏み込んだ。`,
+    '正直':`掘り出した品は、一つずつ手帳に書き留めた。`,
+    '慎重':`ひび割れた天井を見上げ、深い区画は避けて通った。`,
+    '臆病':`物音に肩をすくめ、早めに来た道を引き返した。`
+  };
+  L.push(`${n}は夜明け前、${DUNGEON}の入口をくぐった。`);
+  const shuffled = pool.slice().sort(()=>Math.random()-0.5);
+  for (let d=1; d<=days; d++){
+    let line = `${KANJI[d]}日目。` + shuffled[d-1];
+    if (d === days - 1 || days === 1) line += flavor[a.trait];
+    L.push(line);
+  }
+  if (items.crystal) L.push('背嚢の中で、水晶片が松明の光を返していた。');
+  if (items.ring) L.push(`泥の中から、${n}は小さな銀の指輪を拾い上げた。`);
+  if (injured) L.push(`帰り道で足場が崩れ、${n}は脚を痛めた。${KANJI[rest]||rest}日ほど休養が要る。`);
+  L.push(`夕刻、${n}は荷を背負って帳場の戸を叩いた。`);
+  return L;
+}
+function resolveExpedition(e){
+  const a = adv(e.advId); if (!a) return;
+  const t = TRAITS[a.trait];
+  const injured = Math.random() < clamp(CONFIG.injuryBase + (5-a.skill)*0.03 + t.injury, 0.02, 0.5);
+  const rolls = Math.max(1, Math.round((a.skill + e.days) * t.loot * (injured ? 0.6 : 1)));
+  const items = {};
+  for (let i=0;i<rolls;i++){ const k = weightedItem(); items[k] = (items[k]||0) + rand(...ITEMS[k].qty); }
+  const value = Object.entries(items).reduce((s,[k,q]) => s + price(k)*q, 0);
+  const ask = Math.max(1, Math.round(value * t.ask * (1 - (a.trust-3)*0.04)));
+  const rest = injured ? rand(2,4) : 0;
+  a.status = injured ? 'injured' : 'idle';
+  a.restUntil = S.day + rest;
+  a.trips++;
+  if (!injured) planFor(a);
+  S.stats.trips++;
+  S.reports.unshift({id:S.nextId++, day:S.day, name:a.name, lines:genReport(a, e.days, injured, rest, items), items, injured});
+  S.reports = S.reports.slice(0, 40);
+  S.offers.push({id:S.nextId++, advId:a.id, items, ask, value, haggled:false});
+}
+
+/* ===== 行動 ===== */
+function hire(id){
+  const a = adv(id);
+  if (!a || a.status !== 'idle') return;
+  if (a.trust < 2) return toast(`${a.name}はこの店と組みたがらない。`);
+  if (S.gold < a.plan.advance) return toast('前金が足りません。');
+  S.gold -= a.plan.advance;
+  a.status = 'away';
+  S.expeditions.push({advId:a.id, days:a.plan.days, returnDay:S.day + a.plan.days, advance:a.plan.advance});
+  log(`${a.name}へ前金を渡し、${DUNGEON}へ送り出した。`, -a.plan.advance);
+  toast(`${a.name}を送り出しました。第${S.day + a.plan.days}日に戻ります。`);
+  commit();
+}
+function accept(oid){
+  const o = S.offers.find(x => x.id === oid); if (!o) return;
+  const a = adv(o.advId);
+  if (S.gold < o.ask) return toast('手持ちが足りません。');
+  S.gold -= o.ask;
+  for (const [k,q] of Object.entries(o.items)) S.inventory[k] = (S.inventory[k]||0) + q;
+  S.stats.bought += o.ask;
+  if (Math.random() < 0.5) a.trust = Math.min(5, a.trust + 1);
+  S.offers = S.offers.filter(x => x !== o);
+  log(`${a.name}の戦利品を買い取った。`, -o.ask);
+  toast('買い取りました。倉庫に入れました。');
+  commit();
+}
+function haggle(oid){
+  const o = S.offers.find(x => x.id === oid); if (!o || o.haggled) return;
+  const a = adv(o.advId), t = TRAITS[a.trait];
+  o.haggled = true;
+  if (Math.random() < clamp(t.haggle + (a.trust-3)*0.08, 0.05, 0.9)){
+    o.ask = Math.round(o.ask * CONFIG.haggleCut);
+    toast(`${a.name}は渋々うなずいた。${o.ask}枚で手を打つそうです。`);
+  } else {
+    a.trust = Math.max(0, a.trust - 1);
+    toast(`${a.name}は首を横に振った。信頼が下がりました。`);
+  }
+  commit();
+}
+function refuse(oid){
+  const o = S.offers.find(x => x.id === oid); if (!o) return;
+  const a = adv(o.advId);
+  a.trust = Math.max(0, a.trust - 1);
+  S.offers = S.offers.filter(x => x !== o);
+  log(`${a.name}との買取は破談。品は他の店へ流れた。`, 0);
+  toast('破談にしました。');
+  commit();
+}
+function sell(k, all){
+  const have = S.inventory[k] || 0; if (!have) return;
+  const n = all ? have : 1;
+  let got = 0;
+  for (let i=0;i<n;i++){ got += price(k); S.market[k].price *= (1 - CONFIG.priceImpact); }
+  S.inventory[k] -= n; S.gold += got; S.stats.sold += got;
+  log(`${ITEMS[k].name}×${n}を市場へ卸した。`, got);
+  toast(`${ITEMS[k].name}×${n}を${got}枚で売りました。`);
+  commit();
+}
+function payDebt(){
+  if (S.debt.paid || S.gold < S.debt.amount) return;
+  S.gold -= S.debt.amount; S.debt.paid = true;
+  log('借金を耳を揃えて返済した。', -S.debt.amount);
+  S.over = 'win';
+  commit();
+}
+function endDay(){
+  if (S.over && !S.freePlay) return;
+  if (S.offers.length && !confirm('返事をしていない買取があります。一日を締めると破談になります。締めますか？')) return;
+  for (const o of S.offers){ const a = adv(o.advId); if (a) a.trust = Math.max(0, a.trust - 1); }
+  S.offers = [];
+  if (!S.debt.paid && S.day >= S.debt.due){ S.over = 'lose'; commit(); return; }
+  S.day++; S.ledger = [];
+  updateMarket(); maybeRumor();
+  for (const a of S.adventurers){
+    if (a.status === 'injured' && a.restUntil <= S.day){ a.status = 'idle'; planFor(a); }
+  }
+  const back = S.expeditions.filter(e => e.returnDay <= S.day);
+  S.expeditions = S.expeditions.filter(e => e.returnDay > S.day);
+  back.forEach(resolveExpedition);
+  for (const a of S.adventurers){
+    if (a.status === 'idle' && a.trust <= 0 && Math.random() < 0.5){ a.status = 'gone'; log(`${a.name}は街を去った。`, 0); }
+  }
+  if (S.day % CONFIG.arrivalEvery === 0 && S.adventurers.filter(a => a.status !== 'gone').length < CONFIG.tavernMax){
+    const a = newAdventurer(); S.adventurers.push(a); log(`酒場に新顔が現れた。${a.name}というらしい。`, 0);
+  }
+  UI.tab = 'home';
+  commit();
+  if (back.length) toast(`${back.length}人の冒険者が戻りました。`);
+  window.scrollTo(0,0);
+}
+function commit(){ save(); render(); }
+
+/* ===== 描画 ===== */
+function renderTop(){
+  const d = S.debt, left = d.due - S.day;
+  let dueText, cls = '';
+  if (d.paid){ dueText = '借金は完済済み'; cls = 'paid'; }
+  else {
+    dueText = left > 0 ? `返済 ${d.amount}枚／第${d.due}日の終わりまで（残り${left}日）` : `返済 ${d.amount}枚／今日が期日`;
+    if (left <= 3) cls = 'warn';
+  }
+  document.getElementById('top').innerHTML =
+    `<div class="day">第<b>${S.day}</b>日</div><div class="purse">所持<b>${S.gold}</b>枚</div><div class="due ${cls}">${dueText}</div>`;
+}
+function renderTabs(){
+  const tabs = [['home','帳場'],['tavern','酒場'],['market','倉庫と相場'],['reports','冒険記'],['settings','設定']];
+  document.getElementById('tabs').innerHTML = tabs.map(([k,l]) =>
+    `<button data-act="tab" data-v="${k}" ${UI.tab===k?'aria-current="page"':''}>${l}${k==='home'&&S.offers.length?`<span class="badge">${S.offers.length}</span>`:''}</button>`).join('');
+}
+function viewHome(){
+  let h = '';
+  if (S.offers.length){
+    h += `<section class="sheet"><h2>買取の申し出</h2>`;
+    for (const o of S.offers){
+      const a = adv(o.advId);
+      const ratio = Math.round(o.ask / o.value * 10);
+      h += `<div class="offer">
+        <div class="who">${a.name}<span class="trait">　${a.trait}・信頼 <span class="pips">${pips(a.trust)}</span></span></div>
+        <div class="goods">${itemsText(o.items)}</div>
+        <div class="price"><span class="muted">相場で約 ${o.value}枚</span><span>言い値 <b>${o.ask}</b>枚（約${ratio}割）</span></div>
+        <div class="btns">
+          <button class="btn solid" data-act="accept" data-v="${o.id}" ${S.gold<o.ask?'disabled':''}>買い取る</button>
+          <button class="btn" data-act="haggle" data-v="${o.id}" ${o.haggled?'disabled':''}>値切る</button>
+          <button class="btn" data-act="refuse" data-v="${o.id}">断る</button>
+        </div>
+        ${S.gold<o.ask?'<p class="muted">手持ちが足りません。倉庫の品を売るか、値切ってみましょう。</p>':''}
+      </div>`;
+    }
+    h += `</section>`;
+  }
+  h += `<section class="sheet"><h2>遠征中</h2>`;
+  if (S.expeditions.length){
+    for (const e of S.expeditions){
+      const a = adv(e.advId);
+      h += `<div class="row"><span>${a.name}<span class="muted">　${DUNGEON}</span></span><span>第${e.returnDay}日に帰還</span></div>`;
+    }
+  } else {
+    h += `<p class="muted">遠征中の冒険者はいません。酒場で出資先を探しましょう。</p><div class="btns"><button class="btn" data-act="tab" data-v="tavern">酒場へ行く</button></div>`;
+  }
+  h += `</section>`;
+
+  h += `<section class="sheet"><h2>街の噂</h2>`;
+  h += S.rumors.length ? S.rumors.map(r => `<div class="row"><span>${r.text}</span><span class="muted">第${r.day}日</span></div>`).join('') : `<p class="muted">目立った噂はありません。</p>`;
+  h += `</section>`;
+
+  h += `<section class="sheet"><h2>本日の帳簿</h2>`;
+  h += S.ledger.length ? S.ledger.map(l => `<div class="row"><span>${l.text}</span>${l.v?`<span class="num ${l.v>0?'plus':'minus'}">${l.v>0?'+':'−'}${Math.abs(l.v)}</span>`:''}</div>`).join('') : `<p class="muted">今日はまだ記帳がありません。</p>`;
+  h += `</section>`;
+
+  if (!S.debt.paid){
+    h += `<section class="sheet"><h2>借金</h2>
+      <p>${S.debt.amount}枚を第${S.debt.due}日の終わりまでに返済すること。</p>
+      <div class="btns"><button class="btn solid" data-act="pay" ${S.gold<S.debt.amount?'disabled':''}>返済する（${S.debt.amount}枚）</button></div>
+    </section>`;
+  }
+  h += `<div class="seal-wrap"><button class="seal" data-act="endday" aria-label="一日を締めて翌日へ進む">一日を<br>締める</button><span class="muted">冒険者の帰還と相場の変動は翌朝に</span></div>`;
+  return h;
+}
+function viewTavern(){
+  const list = S.adventurers.filter(a => a.status !== 'gone');
+  const order = {idle:0, injured:1, away:2};
+  list.sort((x,y) => order[x.status] - order[y.status]);
+  let h = `<section class="sheet"><h2>酒場の冒険者</h2><p class="muted">前金を出資して${DUNGEON}へ送り出します。戦利品は戻った日に、まずこの店へ持ち込まれます。</p>`;
+  for (const a of list){
+    const t = TRAITS[a.trait];
+    let status = '';
+    if (a.status === 'away') status = '<span class="tag away">遠征中</span>';
+    if (a.status === 'injured') status = `<span class="tag red">療養中・第${a.restUntil}日まで</span>`;
+    h += `<div class="adv">
+      <div class="head"><span class="name">${a.name}${status}</span><span class="muted">遠征${a.trips}回</span></div>
+      <div class="trait">${a.trait}：${t.desc}</div>
+      <div class="muted">腕前 <span class="pips">${pips(a.skill)}</span>　信頼 <span class="pips">${pips(a.trust)}</span></div>`;
+    if (a.status === 'idle'){
+      const can = S.gold >= a.plan.advance && a.trust >= 2;
+      h += `<div class="btns"><button class="btn solid small" data-act="hire" data-v="${a.id}" ${can?'':'disabled'}>出資する（前金${a.plan.advance}枚・${a.plan.days}日）</button></div>`;
+      if (a.trust < 2) h += `<p class="muted">この店とは組みたがらない様子です。</p>`;
+    }
+    h += `</div>`;
+  }
+  return h + `</section>`;
+}
+function viewMarket(){
+  let total = 0;
+  let rows = '';
+  for (const k in ITEMS){
+    const p = price(k), prev = Math.round(S.market[k].prev), have = S.inventory[k]||0;
+    total += p*have;
+    const diff = p - prev;
+    const mark = diff > 0 ? `<span class="up">▲${diff}</span>` : diff < 0 ? `<span class="down">▼${-diff}</span>` : '';
+    rows += `<tr><td>${ITEMS[k].name}</td><td class="r">${have}</td><td class="r"><span class="num">${p}</span> ${mark}</td>
+      <td><div class="sellbtns"><button class="btn small" data-act="sell1" data-v="${k}" ${have?'':'disabled'}>1つ</button><button class="btn small" data-act="sellall" data-v="${k}" ${have?'':'disabled'}>全部</button></div></td></tr>`;
+  }
+  return `<section class="sheet"><h2>倉庫と相場</h2>
+    <p class="muted">一度に多く卸すと値が下がります。値は日をまたぐと少しずつ戻ります。▲▼は前日との差です。</p>
+    <div class="table-wrap"><table><thead><tr><th>品</th><th class="r">在庫</th><th class="r">相場</th><th class="r">卸す</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p style="margin-top:10px">在庫の相場換算：<span class="num">${total}</span>枚</p></section>`;
+}
+function viewReports(){
+  if (!S.reports.length) return `<section class="sheet"><h2>冒険記</h2><p class="muted">まだ報告は届いていません。冒険者が戻ると、ここに道中の記録が綴られます。</p></section>`;
+  return S.reports.map(r => `<section class="sheet report">
+    <h2>第${r.day}日　${r.name}の冒険記</h2>
+    <div class="lines">${r.lines.map(l=>`<p>${l}</p>`).join('')}</div>
+    <div class="loot">持ち帰った品：${itemsText(r.items)}${r.injured?'<span class="tag red">負傷</span>':''}</div>
+  </section>`).join('');
+}
+function viewSettings(){
+  return `<section class="sheet"><h2>保存データ</h2>
+    <p class="muted">進行はこの端末に自動で保存されています。機種変更や念のための控えには、書き出しをお使いください。</p>
+    <div class="btns">
+      <button class="btn" data-act="exportfile">控えをファイルに保存</button>
+      <button class="btn" data-act="showcode">控えの文字列を表示</button>
+    </div>
+    ${UI.showCode?`<textarea id="codeout" readonly>${exportCode()}</textarea><div class="btns"><button class="btn small" data-act="copycode">写しを取る</button></div>`:''}
+  </section>
+  <section class="sheet"><h2>控えから読み込む</h2>
+    <p class="muted">今の進行は上書きされます。</p>
+    <textarea id="codein" placeholder="控えの文字列を貼り付け"></textarea>
+    <div class="btns">
+      <button class="btn" data-act="importcode">文字列から読み込む</button>
+      <label class="btn">ファイルから読み込む<input type="file" id="filein" accept=".json,.txt,application/json,text/plain" hidden></label>
+    </div>
+  </section>
+  <section class="sheet"><h2>最初からやり直す</h2>
+    <p class="muted">今の進行は消えます。控えを取ってからの実行をおすすめします。</p>
+    <div class="btns"><button class="btn" data-act="reset">最初からやり直す</button></div>
+  </section>
+  <section class="sheet"><h2>この遊戯について</h2>
+    <div class="row"><span>題名</span><span>Commenda: Delve &amp; Dividend</span></div>
+    <div class="row"><span>版</span><span class="num">${VERSION}</span></div>
+    <div class="row"><span>段階</span><span>試作（技術検証）</span></div>
+  </section>`;
+}
+function renderOverlay(){
+  const el = document.getElementById('overlay');
+  if (S.over === 'win' && !S.freePlay){
+    el.innerHTML = `<div class="overlay"><section class="sheet"><h2>借金を完済しました</h2>
+      <p>第${S.day}日、帳場の借金はすべて返し終えました。</p>
+      <div class="row"><span>遠征の回数</span><span class="num">${S.stats.trips}回</span></div>
+      <div class="row"><span>買い取りの総額</span><span class="num">${S.stats.bought}枚</span></div>
+      <div class="row"><span>売り上げの総額</span><span class="num">${S.stats.sold}枚</span></div>
+      <div class="row"><span>手元に残った銀貨</span><span class="num">${S.gold}枚</span></div>
+      <p class="muted" style="margin-top:8px">試作はここまでです。続けて商いを試すこともできます。</p>
+      <div class="btns"><button class="btn solid" data-act="freeplay">続けて商う</button><button class="btn" data-act="newgame">最初から</button></div>
+    </section></div>`;
+  } else if (S.over === 'lose'){
+    el.innerHTML = `<div class="overlay"><section class="sheet"><h2>返済期日を過ぎました</h2>
+      <p>第${S.debt.due}日の終わりまでに${S.debt.amount}枚を揃えられず、帳場は差し押さえられました。</p>
+      <div class="row"><span>手元の銀貨</span><span class="num">${S.gold}枚</span></div>
+      <div class="row"><span>遠征の回数</span><span class="num">${S.stats.trips}回</span></div>
+      <div class="btns"><button class="btn solid" data-act="newgame">最初から</button></div>
+    </section></div>`;
+  } else el.innerHTML = '';
+}
+function render(){
+  renderTop(); renderTabs();
+  const views = {home:viewHome, tavern:viewTavern, market:viewMarket, reports:viewReports, settings:viewSettings};
+  document.getElementById('main').innerHTML = views[UI.tab]();
+  renderOverlay();
+}
+let toastTimer = null;
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+/* ===== 操作 ===== */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
+  const v = b.dataset.v, act = b.dataset.act;
+  switch (act){
+    case 'tab': UI.tab = v; UI.showCode = false; render(); window.scrollTo(0,0); break;
+    case 'hire': hire(+v); break;
+    case 'accept': accept(+v); break;
+    case 'haggle': haggle(+v); break;
+    case 'refuse': refuse(+v); break;
+    case 'sell1': sell(v, false); break;
+    case 'sellall': sell(v, true); break;
+    case 'pay': payDebt(); break;
+    case 'endday': endDay(); break;
+    case 'freeplay': S.freePlay = true; S.over = null; commit(); break;
+    case 'newgame': newGame(); UI.tab = 'home'; commit(); break;
+    case 'reset': if (confirm('最初からやり直します。今の進行は消えますが、よろしいですか？')){ newGame(); UI.tab = 'home'; commit(); toast('新しい帳場を開きました。'); } break;
+    case 'showcode': UI.showCode = true; render(); break;
+    case 'copycode': {
+      const t = document.getElementById('codeout');
+      (navigator.clipboard ? navigator.clipboard.writeText(t.value) : Promise.reject()).then(() => toast('写しを取りました。')).catch(() => { t.select(); toast('文字列を選択しました。長押しで写してください。'); });
+      break;
+    }
+    case 'exportfile': {
+      const blob = new Blob([JSON.stringify(S)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = `commenda-day${S.day}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      break;
+    }
+    case 'importcode': {
+      const t = document.getElementById('codein').value;
+      if (!t.trim()) return toast('控えの文字列を貼り付けてください。');
+      if (!confirm('今の進行を上書きして読み込みます。よろしいですか？')) return;
+      try { importText(t); toast('控えを読み込みました。'); } catch(err){ toast('読み込めませんでした。文字列が欠けていないか確かめてください。'); }
+      break;
+    }
+  }
+});
+document.addEventListener('change', e => {
+  if (e.target.id !== 'filein' || !e.target.files[0]) return;
+  const r = new FileReader();
+  r.onload = () => {
+    if (!confirm('今の進行を上書きして読み込みます。よろしいですか？')) return;
+    try { importText(String(r.result)); toast('控えを読み込みました。'); } catch(err){ toast('読み込めませんでした。Commendaの控えファイルか確かめてください。'); }
+  };
+  r.readAsText(e.target.files[0]);
+});
+
+/* ===== 起動 ===== */
+if (!load()) { newGame(); save(); }
+render();
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

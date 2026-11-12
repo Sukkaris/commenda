@@ -1,0 +1,13 @@
+# OSの不要ファイル
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# エディタ・作業用
+.vscode/
+.idea/
+*.swp
+*~
+.claude/settings.local.json
