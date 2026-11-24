@@ -1,5 +1,5 @@
 // 版を上げたら CACHE の名前も変える
-const CACHE = 'commenda-v0.1.0';
+const CACHE = 'commenda-v0.1.1';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
