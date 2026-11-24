@@ -35,6 +35,8 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0}
+/* ダブルタップでの拡大を止める（ピンチでの拡大は残す） */
+html,button,label,input,select,textarea,a,.btn,[data-act]{touch-action:manipulation}
 body{
   background:var(--baize);
   background-image:radial-gradient(circle at 30% 20%,rgba(255,255,255,.04),transparent 60%);
@@ -181,7 +183,7 @@ textarea{width:100%;min-height:90px;font:13px/1.5 ui-monospace,Menlo,monospace;b
 
 <script>
 'use strict';
-const VERSION = 'v0.1.0';
+const VERSION = 'v0.1.1';
 const SAVE_KEY = 'commenda-save';
 
 /* ===== 調整用の数値（遊び心地を見ながらここを変える） ===== */
