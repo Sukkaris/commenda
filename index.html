@@ -57,11 +57,13 @@ button{font:inherit;color:inherit}
   background:var(--baize-deep);
   color:#efe6cf;
   padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 10px;
-  display:grid; grid-template-columns:auto 1fr; gap:2px 14px; align-items:baseline;
+  display:grid; grid-template-columns:auto 1fr auto; gap:2px 12px; align-items:baseline;
   border-bottom:1px solid rgba(0,0,0,.35);
 }
 .top .day{font-size:15px}
 .top .day b{font-size:26px;font-weight:800;margin:0 2px}
+.top .rep{justify-self:center;font-size:13px;opacity:.9}
+.top .rep b{font-size:16px;font-weight:600;margin-left:5px;letter-spacing:.08em}
 .top .purse{justify-self:end;font-size:15px}
 .top .purse b{font-size:22px;font-weight:600;margin:0 3px;color:#e8c46a}
 .top .due{grid-column:1/-1;font-size:13px;opacity:.85}
@@ -191,7 +193,7 @@ const SAVE_VER = 2;  // 保存データの形の版。変えたら migrate() に
 /* ===== 調整用の数値（遊び心地を見ながらここを変える） ===== */
 const CONFIG = {
   startGold: 400,        // 開始時の所持金
-  debtAmount: 1000,      // 借金の額
+  debtAmount: 1200,      // 借金の額
   debtDue: 20,           // 返済期日（この日の終わりまで）
   tavernStart: 6,        // 開始時に酒場にいる冒険者の数
   tavernMax: 8,          // 街にいる冒険者の上限
@@ -203,8 +205,22 @@ const CONFIG = {
   meanRevert: 0.30,      // 相場が基準値へ戻ろうとする強さ
   noise: 0.08,           // 相場の日々のゆらぎ
   rumorChance: 0.22,     // 一日に噂が立つ確率
-  haggleCut: 0.8         // 値切りに成功したときの価格倍率
+  haggleCut: 0.75,       // 値切りに成功したときの価格倍率
+  haggleTrustStep: 0.08, // 信頼1段ごとの値切り成功率の加減
+  haggleFailTrust: 2,    // 値切りに失敗したときに下がる信頼
+  askTrustStep: 0.10,    // 信頼1段ごとの言い値の加減（信頼が高いほど安く言う）
+  // 店の評判（0〜100）
+  repStart: 50,          // 開始時の評判
+  repAcceptAsk: 1,       // 言い値のまま買い取ったとき
+  repHaggleWin: -1,      // 値切りに成功したとき
+  repHaggleLose: -4,     // 値切りに失敗したとき
+  repRefuse: -2,         // 買取を断った・返事をせずに破談にしたとき
+  repHaggleDiv: 100,     // 値切り成功率に (評判−50)÷この値 を加える
+  repTrustHigh: 70,      // 評判がこれ以上なら、新顔の初期の信頼は4
+  repTrustLow: 30        // 評判がこれ以下なら、新顔の初期の信頼は2（それ以外は3）
 };
+/* 評判の表示（下限の値と語） */
+const REP_WORDS = [[80,'名声'],[60,'好評'],[40,'無名'],[20,'不評'],[0,'悪名']];
 
 const DUNGEON = '灰鉄の坑道';
 
@@ -228,9 +244,9 @@ const TRAITS = {
     '臆病': {loot:0.75, injury:-0.09}
   },
   deal: {
-    'がめつい': {ask:0.52, haggle:0.15, adv:10},
-    '正直':     {ask:0.40, haggle:0.30, adv:0},
-    'お人好し': {ask:0.46, haggle:0.70, adv:-5}
+    'がめつい': {ask:0.52, haggle:0.10, adv:10},
+    '正直':     {ask:0.40, haggle:0.20, adv:0},
+    'お人好し': {ask:0.46, haggle:0.80, adv:-5}
   }
 };
 /* ver 1（v0.1.x）の性格5種を二軸へ読み替える表 */
@@ -267,6 +283,9 @@ const pips = (n, max=5) => '●'.repeat(n) + '○'.repeat(Math.max(0,max-n));
 const exploreOf = a => TRAITS.explore[a.explore];
 const dealOf = a => TRAITS.deal[a.deal];
 const traitText = a => `${a.explore}、${a.deal}`;  // 主人公の人物評（二語のみ）
+const repWord = () => REP_WORDS.find(([min]) => S.rep >= min)[1];
+function addRep(d){ S.rep = clamp(S.rep + d, 0, 100); }
+function startTrust(){ return S.rep >= CONFIG.repTrustHigh ? 4 : S.rep <= CONFIG.repTrustLow ? 2 : 3; }
 
 /* ===== 状態 ===== */
 let S = null;
@@ -279,13 +298,13 @@ function newAdventurer(){
   const used = new Set(S.adventurers.map(a => a.name));
   const free = NAMES.filter(n => !used.has(n));
   const name = free.length ? pick(free) : pick(NAMES) + '二世';
-  const a = {id:S.nextId++, name, skill:pick([1,2,2,3,3,3,4,4,5]), explore:pick(Object.keys(TRAITS.explore)), deal:pick(Object.keys(TRAITS.deal)), trust:3, status:'idle', restUntil:0, trips:0};
+  const a = {id:S.nextId++, name, skill:pick([1,2,2,3,3,3,4,4,5]), explore:pick(Object.keys(TRAITS.explore)), deal:pick(Object.keys(TRAITS.deal)), trust:startTrust(), status:'idle', restUntil:0, trips:0};
   planFor(a);
   return a;
 }
 function newGame(){
   S = {
-    ver:SAVE_VER, day:1, gold:CONFIG.startGold,
+    ver:SAVE_VER, day:1, gold:CONFIG.startGold, rep:CONFIG.repStart,
     debt:{amount:CONFIG.debtAmount, due:CONFIG.debtDue, paid:false},
     adventurers:[], expeditions:[], offers:[], inventory:{}, market:{}, rumors:[], reports:[], ledger:[],
     over:null, freePlay:false, nextId:1, stats:{trips:0, bought:0, sold:0}
@@ -310,6 +329,7 @@ function migrate(o){
       const [ex, de] = OLD_TRAIT_MAP[a.trait] || ['慎重','正直'];
       a.explore = ex; a.deal = de; delete a.trait;
     }
+    o.rep = CONFIG.repStart;  // 評判は v0.2.0 で新設
     o.ver = 2;
   }
   if (o.ver !== SAVE_VER) return null;
@@ -402,7 +422,7 @@ function resolveExpedition(e){
   const items = {};
   for (let i=0;i<rolls;i++){ const k = weightedItem(); items[k] = (items[k]||0) + rand(...ITEMS[k].qty); }
   const value = Object.entries(items).reduce((s,[k,q]) => s + price(k)*q, 0);
-  const ask = Math.max(1, Math.round(value * de.ask * (1 - (a.trust-3)*0.04)));
+  const ask = Math.max(1, Math.round(value * de.ask * (1 - (a.trust-3)*CONFIG.askTrustStep)));
   const rest = injured ? rand(2,4) : 0;
   a.status = injured ? 'injured' : 'idle';
   a.restUntil = S.day + rest;
@@ -435,21 +455,28 @@ function accept(oid){
   for (const [k,q] of Object.entries(o.items)) S.inventory[k] = (S.inventory[k]||0) + q;
   S.stats.bought += o.ask;
   if (Math.random() < 0.5) a.trust = Math.min(5, a.trust + 1);
+  const atAsk = !o.haggled;
+  if (atAsk) addRep(CONFIG.repAcceptAsk);
   S.offers = S.offers.filter(x => x !== o);
-  log(`${a.name}の戦利品を買い取った。`, -o.ask);
-  toast('買い取りました。倉庫に入れました。');
+  log(`${a.name}の戦利品を${atAsk?'言い値で':''}買い取った。`, -o.ask);
+  toast(atAsk ? '言い値で買い取りました。気前のよい店だと噂になりそうです。' : '買い取りました。倉庫に入れました。');
   commit();
+}
+function haggleChance(a){
+  return clamp(dealOf(a).haggle + (a.trust-3)*CONFIG.haggleTrustStep + (S.rep-50)/CONFIG.repHaggleDiv, 0.05, 0.9);
 }
 function haggle(oid){
   const o = S.offers.find(x => x.id === oid); if (!o || o.haggled) return;
   const a = adv(o.advId);
   o.haggled = true;
-  if (Math.random() < clamp(dealOf(a).haggle + (a.trust-3)*0.08, 0.05, 0.9)){
+  if (Math.random() < haggleChance(a)){
     o.ask = Math.round(o.ask * CONFIG.haggleCut);
+    addRep(CONFIG.repHaggleWin);
     toast(`${a.name}は渋々うなずいた。${o.ask}枚で手を打つそうです。`);
   } else {
-    a.trust = Math.max(0, a.trust - 1);
-    toast(`${a.name}は首を横に振った。信頼が下がりました。`);
+    a.trust = Math.max(0, a.trust - CONFIG.haggleFailTrust);
+    addRep(CONFIG.repHaggleLose);
+    toast(`${a.name}は首を横に振った。信頼が下がり、店の評判にも響きました。`);
   }
   commit();
 }
@@ -457,6 +484,7 @@ function refuse(oid){
   const o = S.offers.find(x => x.id === oid); if (!o) return;
   const a = adv(o.advId);
   a.trust = Math.max(0, a.trust - 1);
+  addRep(CONFIG.repRefuse);
   S.offers = S.offers.filter(x => x !== o);
   log(`${a.name}との買取は破談。品は他の店へ流れた。`, 0);
   toast('破談にしました。');
@@ -482,7 +510,7 @@ function payDebt(){
 function endDay(){
   if (S.over && !S.freePlay) return;
   if (S.offers.length && !confirm('返事をしていない買取があります。一日を締めると破談になります。締めますか？')) return;
-  for (const o of S.offers){ const a = adv(o.advId); if (a) a.trust = Math.max(0, a.trust - 1); }
+  for (const o of S.offers){ const a = adv(o.advId); if (a) a.trust = Math.max(0, a.trust - 1); addRep(CONFIG.repRefuse); }
   S.offers = [];
   if (!S.debt.paid && S.day >= S.debt.due){ S.over = 'lose'; commit(); return; }
   S.day++; S.ledger = [];
@@ -516,7 +544,7 @@ function renderTop(){
     if (left <= 3) cls = 'warn';
   }
   document.getElementById('top').innerHTML =
-    `<div class="day">第<b>${S.day}</b>日</div><div class="purse">所持<b>${S.gold}</b>枚</div><div class="due ${cls}">${dueText}</div>`;
+    `<div class="day">第<b>${S.day}</b>日</div><div class="rep">評判<b>${repWord()}</b></div><div class="purse">所持<b>${S.gold}</b>枚</div><div class="due ${cls}">${dueText}</div>`;
 }
 function renderTabs(){
   const tabs = [['home','帳場'],['tavern','酒場'],['market','倉庫と相場'],['reports','冒険記'],['settings','設定']];
