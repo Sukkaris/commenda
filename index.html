@@ -186,6 +186,7 @@ textarea{width:100%;min-height:90px;font:13px/1.5 ui-monospace,Menlo,monospace;b
 'use strict';
 const VERSION = 'v0.1.3';
 const SAVE_KEY = 'commenda-save';
+const SAVE_VER = 2;  // 保存データの形の版。変えたら migrate() に変換を足す
 
 /* ===== 調整用の数値（遊び心地を見ながらここを変える） ===== */
 const CONFIG = {
@@ -217,12 +218,25 @@ const ITEMS = {
   ring:    {name:'銀の指輪',   base:75, w:3,  qty:[1,1]}
 };
 
+/* 冒険者の性格は二つの軸。どの語も、どの場面でも同じ向きに効く。
+   探索：持ち帰る量（loot倍率）と負傷しやすさ（injury加減）。冒険記の一文もこちらで決まる
+   取引：言い値の高さ（ask＝相場に対する割合）、値切りの通りやすさ（haggle＝基本の成功率）、前金（adv加減） */
 const TRAITS = {
-  '強欲': {loot:1.30, injury: 0.08, ask:0.52, haggle:0.25, adv:10, desc:'取り分にうるさいが、よく掘る'},
-  '豪胆': {loot:1.15, injury: 0.06, ask:0.47, haggle:0.40, adv:5,  desc:'危ない区画にも踏み込む'},
-  '正直': {loot:1.00, injury: 0.00, ask:0.40, haggle:0.50, adv:0,  desc:'値付けが素直'},
-  '慎重': {loot:0.85, injury:-0.06, ask:0.44, haggle:0.45, adv:0,  desc:'稼ぎは控えめだが怪我が少ない'},
-  '臆病': {loot:0.75, injury:-0.09, ask:0.42, haggle:0.60, adv:-5, desc:'すぐ引き返すが、押しに弱い'}
+  explore: {
+    '大胆': {loot:1.25, injury: 0.07},
+    '慎重': {loot:0.90, injury:-0.05},
+    '臆病': {loot:0.75, injury:-0.09}
+  },
+  deal: {
+    'がめつい': {ask:0.52, haggle:0.15, adv:10},
+    '正直':     {ask:0.40, haggle:0.30, adv:0},
+    'お人好し': {ask:0.46, haggle:0.70, adv:-5}
+  }
+};
+/* ver 1（v0.1.x）の性格5種を二軸へ読み替える表 */
+const OLD_TRAIT_MAP = {
+  '強欲': ['大胆','がめつい'], '豪胆': ['大胆','正直'], '正直': ['慎重','正直'],
+  '慎重': ['慎重','正直'], '臆病': ['臆病','お人好し']
 };
 
 const NAMES = ['ガルド','ベルタ','オスリック','マティルダ','ヨハン','リーゼル','コンラート','ヘドヴィグ','ウルリヒ','エルザ','ティボー','イゾルデ','ロタール','グレーテ','ベネディクト','アグネス','ディートリヒ','ミリアム','ファルク','ジルケ','ルトガー','ウタ','アルノー','クニグンデ'];
@@ -250,25 +264,28 @@ const price = k => Math.max(1, Math.round(S.market[k].price));
 const adv = id => S.adventurers.find(a => a.id === id);
 const itemsText = items => Object.entries(items).map(([k,q]) => `${ITEMS[k].name}×${q}`).join('、');
 const pips = (n, max=5) => '●'.repeat(n) + '○'.repeat(Math.max(0,max-n));
+const exploreOf = a => TRAITS.explore[a.explore];
+const dealOf = a => TRAITS.deal[a.deal];
+const traitText = a => `${a.explore}、${a.deal}`;  // 主人公の人物評（二語のみ）
 
 /* ===== 状態 ===== */
 let S = null;
 let UI = {tab:'home', showCode:false};
 
 function planFor(a){
-  a.plan = {days: rand(2,3), advance: Math.max(5, CONFIG.advanceBase + a.skill*CONFIG.advancePerSkill + TRAITS[a.trait].adv)};
+  a.plan = {days: rand(2,3), advance: Math.max(5, CONFIG.advanceBase + a.skill*CONFIG.advancePerSkill + dealOf(a).adv)};
 }
 function newAdventurer(){
   const used = new Set(S.adventurers.map(a => a.name));
   const free = NAMES.filter(n => !used.has(n));
   const name = free.length ? pick(free) : pick(NAMES) + '二世';
-  const a = {id:S.nextId++, name, skill:pick([1,2,2,3,3,3,4,4,5]), trait:pick(Object.keys(TRAITS)), trust:3, status:'idle', restUntil:0, trips:0};
+  const a = {id:S.nextId++, name, skill:pick([1,2,2,3,3,3,4,4,5]), explore:pick(Object.keys(TRAITS.explore)), deal:pick(Object.keys(TRAITS.deal)), trust:3, status:'idle', restUntil:0, trips:0};
   planFor(a);
   return a;
 }
 function newGame(){
   S = {
-    ver:1, day:1, gold:CONFIG.startGold,
+    ver:SAVE_VER, day:1, gold:CONFIG.startGold,
     debt:{amount:CONFIG.debtAmount, due:CONFIG.debtDue, paid:false},
     adventurers:[], expeditions:[], offers:[], inventory:{}, market:{}, rumors:[], reports:[], ledger:[],
     over:null, freePlay:false, nextId:1, stats:{trips:0, bought:0, sold:0}
@@ -284,21 +301,40 @@ function newGame(){
 function log(text, v){ S.ledger.push({text, v}); }
 
 /* ===== 保存 ===== */
+/* 古い版の保存データを今の形へ直す。読めない形なら null を返す */
+function migrate(o){
+  if (!o || typeof o !== 'object' || !o.market || !Array.isArray(o.adventurers)) return null;
+  if (o.ver === 1){
+    // v0.1.x → v0.2.0：性格5種を二軸へ
+    for (const a of o.adventurers){
+      const [ex, de] = OLD_TRAIT_MAP[a.trait] || ['慎重','正直'];
+      a.explore = ex; a.deal = de; delete a.trait;
+    }
+    o.ver = 2;
+  }
+  if (o.ver !== SAVE_VER) return null;
+  return o;
+}
 function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
 function load(){
   try{
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return false;
-    const o = JSON.parse(raw);
-    if (!o || o.ver !== 1) return false;
-    S = o; return true;
+    let o = null;
+    try{ o = migrate(JSON.parse(raw)); }catch(e){}
+    if (!o){
+      // 読めなかった保存データは、新しい帳場で上書きする前に別の名前で取っておく
+      localStorage.setItem(SAVE_KEY + '-unreadable', raw);
+      return false;
+    }
+    S = o; save(); return true;
   }catch(e){ return false; }
 }
 function exportCode(){ return btoa(unescape(encodeURIComponent(JSON.stringify(S)))); }
 function importText(text){
   const t = text.trim();
-  const o = t.startsWith('{') ? JSON.parse(t) : JSON.parse(decodeURIComponent(escape(atob(t))));
-  if (!o || o.ver !== 1 || !o.market || !o.adventurers) throw new Error('bad');
+  const o = migrate(t.startsWith('{') ? JSON.parse(t) : JSON.parse(decodeURIComponent(escape(atob(t)))));
+  if (!o) throw new Error('bad');
   S = o; save(); render();
 }
 
@@ -340,10 +376,8 @@ function genReport(a, days, injured, rest, items){
     `遠くで落石の音が響き、${n}はしばらく息を潜めた。`,
     `湿った岩壁にもたれ、${n}は乾いたパンをかじった。`
   ];
-  const flavor = {
-    '強欲':`「まだ掘れる」と言い張り、松明が尽きかけるまで粘った。`,
-    '豪胆':`崩れかけた横穴へも、ためらわず踏み込んだ。`,
-    '正直':`掘り出した品は、一つずつ手帳に書き留めた。`,
+  const flavor = {  // 探索の軸に対応する一文
+    '大胆':`崩れかけた横穴へも、ためらわず踏み込んだ。`,
     '慎重':`ひび割れた天井を見上げ、深い区画は避けて通った。`,
     '臆病':`物音に肩をすくめ、早めに来た道を引き返した。`
   };
@@ -351,7 +385,7 @@ function genReport(a, days, injured, rest, items){
   const shuffled = pool.slice().sort(()=>Math.random()-0.5);
   for (let d=1; d<=days; d++){
     let line = `${KANJI[d]}日目。` + shuffled[d-1];
-    if (d === days - 1 || days === 1) line += flavor[a.trait];
+    if (d === days - 1 || days === 1) line += flavor[a.explore];
     L.push(line);
   }
   if (items.crystal) L.push('背嚢の中で、水晶片が松明の光を返していた。');
@@ -362,13 +396,13 @@ function genReport(a, days, injured, rest, items){
 }
 function resolveExpedition(e){
   const a = adv(e.advId); if (!a) return;
-  const t = TRAITS[a.trait];
-  const injured = Math.random() < clamp(CONFIG.injuryBase + (5-a.skill)*0.03 + t.injury, 0.02, 0.5);
-  const rolls = Math.max(1, Math.round((a.skill + e.days) * t.loot * (injured ? 0.6 : 1)));
+  const ex = exploreOf(a), de = dealOf(a);
+  const injured = Math.random() < clamp(CONFIG.injuryBase + (5-a.skill)*0.03 + ex.injury, 0.02, 0.5);
+  const rolls = Math.max(1, Math.round((a.skill + e.days) * ex.loot * (injured ? 0.6 : 1)));
   const items = {};
   for (let i=0;i<rolls;i++){ const k = weightedItem(); items[k] = (items[k]||0) + rand(...ITEMS[k].qty); }
   const value = Object.entries(items).reduce((s,[k,q]) => s + price(k)*q, 0);
-  const ask = Math.max(1, Math.round(value * t.ask * (1 - (a.trust-3)*0.04)));
+  const ask = Math.max(1, Math.round(value * de.ask * (1 - (a.trust-3)*0.04)));
   const rest = injured ? rand(2,4) : 0;
   a.status = injured ? 'injured' : 'idle';
   a.restUntil = S.day + rest;
@@ -408,9 +442,9 @@ function accept(oid){
 }
 function haggle(oid){
   const o = S.offers.find(x => x.id === oid); if (!o || o.haggled) return;
-  const a = adv(o.advId), t = TRAITS[a.trait];
+  const a = adv(o.advId);
   o.haggled = true;
-  if (Math.random() < clamp(t.haggle + (a.trust-3)*0.08, 0.05, 0.9)){
+  if (Math.random() < clamp(dealOf(a).haggle + (a.trust-3)*0.08, 0.05, 0.9)){
     o.ask = Math.round(o.ask * CONFIG.haggleCut);
     toast(`${a.name}は渋々うなずいた。${o.ask}枚で手を打つそうです。`);
   } else {
@@ -497,7 +531,7 @@ function viewHome(){
       const a = adv(o.advId);
       const ratio = Math.round(o.ask / o.value * 10);
       h += `<div class="offer">
-        <div class="who">${a.name}<span class="trait">　${a.trait}・信頼 <span class="pips">${pips(a.trust)}</span></span></div>
+        <div class="who">${a.name}<span class="trait">　${traitText(a)}・信頼 <span class="pips">${pips(a.trust)}</span></span></div>
         <div class="goods">${itemsText(o.items)}</div>
         <div class="price"><span class="muted">相場で約 ${o.value}枚</span><span>言い値 <b>${o.ask}</b>枚（約${ratio}割）</span></div>
         <div class="btns">
@@ -544,13 +578,12 @@ function viewTavern(){
   list.sort((x,y) => order[x.status] - order[y.status]);
   let h = `<section class="sheet"><h2>酒場の冒険者</h2><p class="muted">前金を出資して${DUNGEON}へ送り出します。戦利品は戻った日に、まずこの店へ持ち込まれます。</p>`;
   for (const a of list){
-    const t = TRAITS[a.trait];
     let status = '';
     if (a.status === 'away') status = '<span class="tag away">遠征中</span>';
     if (a.status === 'injured') status = `<span class="tag red">療養中・第${a.restUntil}日まで</span>`;
     h += `<div class="adv">
       <div class="head"><span class="name">${a.name}${status}</span><span class="muted">遠征${a.trips}回</span></div>
-      <div class="trait">${a.trait}：${t.desc}</div>
+      <div class="trait">${traitText(a)}</div>
       <div class="muted">腕前 <span class="pips">${pips(a.skill)}</span>　信頼 <span class="pips">${pips(a.trust)}</span></div>`;
     if (a.status === 'idle'){
       const can = S.gold >= a.plan.advance && a.trust >= 2;
