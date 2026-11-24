@@ -35,8 +35,9 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0}
-/* ダブルタップでの拡大を止める（ピンチでの拡大は残す） */
-html,button,label,input,select,textarea,a,.btn,[data-act]{touch-action:manipulation}
+/* ダブルタップでの拡大を止める（ピンチでの拡大は残す）。
+   iPhoneのSafariは親の指定を子に引き継がないことがあるため、全要素に直接付ける */
+*{touch-action:manipulation}
 body{
   background:var(--baize);
   background-image:radial-gradient(circle at 30% 20%,rgba(255,255,255,.04),transparent 60%);
@@ -183,7 +184,7 @@ textarea{width:100%;min-height:90px;font:13px/1.5 ui-monospace,Menlo,monospace;b
 
 <script>
 'use strict';
-const VERSION = 'v0.1.1';
+const VERSION = 'v0.1.2';
 const SAVE_KEY = 'commenda-save';
 
 /* ===== 調整用の数値（遊び心地を見ながらここを変える） ===== */
@@ -694,6 +695,34 @@ document.addEventListener('change', e => {
   };
   r.readAsText(e.target.files[0]);
 });
+
+/* ===== ダブルタップでの拡大止め（予備策） =====
+   CSSの指定を守らない版のiPhoneに備え、素早い二度目のタップは拡大を打ち消す。
+   二度目が釦なら普通に押したものとして扱い、連打は2回とも効く。
+   指を動かした操作（スクロール）や2本指（ピンチ拡大）、文字欄の中の操作には手を出さず、
+   それらの直後のタップも二度目とは数えない（スクロールを止めるタップで釦が押されないように）。 */
+const DOUBLE_TAP_MS = 350, TAP_SLOP_PX = 10;
+let lastTouchEnd = 0, touchMoved = false, touchX = 0, touchY = 0;
+document.addEventListener('touchstart', e => {
+  touchMoved = e.touches.length > 1;
+  if (!touchMoved) { touchX = e.touches[0].clientX; touchY = e.touches[0].clientY; }
+}, { passive: true });
+document.addEventListener('touchmove', e => {
+  const p = e.touches[0];
+  if (e.touches.length > 1 || Math.abs(p.clientX - touchX) > TAP_SLOP_PX || Math.abs(p.clientY - touchY) > TAP_SLOP_PX) touchMoved = true;
+}, { passive: true });
+document.addEventListener('touchend', e => {
+  const t = e.target;
+  const inField = t.closest && t.closest('input,textarea,select');
+  if (touchMoved || e.touches.length > 0 || inField) { lastTouchEnd = 0; return; }
+  const now = Date.now();
+  if (now - lastTouchEnd < DOUBLE_TAP_MS) {
+    e.preventDefault();
+    const c = t.closest && t.closest('button,label,a,[data-act]');
+    if (c) c.click();
+  }
+  lastTouchEnd = now;  // 三度目以降の素早いタップも続けて打ち消す
+}, { passive: false });
 
 /* ===== 起動 ===== */
 if (!load()) { newGame(); save(); }
