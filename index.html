@@ -120,14 +120,8 @@ main{max-width:560px;margin:0 auto;padding:14px 12px calc(96px + env(safe-area-i
 .tag{display:inline-block;font-size:13px;border:1px solid currentColor;border-radius:2px;padding:0 6px;margin-left:6px}
 .tag.red{color:var(--rubric)} .tag.away{color:var(--ink-soft)}
 
-/* 相場表 */
-.table-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:15px}
-th{font-weight:600;text-align:left;color:var(--ink-soft);font-size:13px;padding:4px 4px 6px;border-bottom:1px solid var(--ink)}
-td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
-td.r,th.r{text-align:right}
+/* 相場の上げ下げ */
 .up{color:var(--ok);font-size:12px} .down{color:var(--rubric);font-size:12px}
-.sellbtns{display:flex;gap:6px;justify-content:flex-end}
 
 /* 冒険記 */
 .report .title{font-weight:800}
@@ -146,19 +140,65 @@ td.r,th.r{text-align:right}
 .seal:active{transform:scale(.95)}
 .seal-wrap .muted{color:#d8ceb6;font-size:13px}
 
-/* 下部の見出し */
+/* 下部の付箋（台帳の下端から覗くインデックスシール） */
 nav.tabs{
   position:fixed;left:0;right:0;bottom:0;z-index:30;
-  background:var(--paper-2);border-top:1px solid var(--line);
-  display:grid;grid-template-columns:repeat(5,1fr);
-  padding-bottom:env(safe-area-inset-bottom,0px);
+  background:var(--baize-deep);
+  display:grid;grid-template-columns:repeat(5,1fr);gap:4px;align-items:start;
+  padding:0 8px calc(env(safe-area-inset-bottom,0px) + 6px);
+  box-shadow:0 -4px 10px -4px rgba(0,0,0,.45);
+}
+/* 台帳の下端（紙の帯） */
+nav.tabs::before{
+  content:"";position:absolute;left:0;right:0;top:0;height:9px;z-index:1;
+  background:var(--paper);border-bottom:1px solid var(--line);
+  box-shadow:0 2px 3px rgba(0,0,0,.35);
 }
 nav.tabs button{
-  background:none;border:0;padding:12px 2px 10px;font-size:13px;cursor:pointer;position:relative;color:var(--ink-soft)
+  --tab:var(--paper-2);
+  position:relative;margin-top:9px;min-height:46px;
+  padding:9px 2px 7px;border:0;border-radius:0 0 7px 7px;
+  background:var(--tab);color:var(--ink-soft);
+  font-size:12.5px;line-height:1.3;letter-spacing:-.02em;white-space:nowrap;cursor:pointer;
+  box-shadow:inset 0 7px 6px -5px rgba(0,0,0,.35),0 2px 3px rgba(0,0,0,.35);
 }
-nav.tabs button[aria-current="page"]{color:var(--ink);font-weight:800}
-nav.tabs button[aria-current="page"]::after{content:"";position:absolute;left:28%;right:28%;top:0;border-top:3px solid var(--rubric)}
-.badge{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:9px;background:var(--rubric);color:#fff;font-size:11px;margin-left:3px;padding:0 4px;vertical-align:1px}
+/* 付箋ごとの色味（配色表の羅紗・紙・墨・朱・金の範囲で） */
+nav.tabs button[data-v="home"]{--tab:color-mix(in srgb,var(--paper-2) 84%,var(--rubric))}
+nav.tabs button[data-v="tavern"]{--tab:color-mix(in srgb,var(--paper-2) 80%,var(--gilt))}
+nav.tabs button[data-v="market"]{--tab:color-mix(in srgb,var(--paper-2) 82%,var(--ok))}
+nav.tabs button[data-v="reports"]{--tab:color-mix(in srgb,var(--paper-2) 86%,var(--ink))}
+nav.tabs button[data-v="settings"]{--tab:var(--paper-2)}
+/* 開いている付箋は紙面とつながって見える（帯の上に重ねて継ぎ目を消す） */
+nav.tabs button[aria-current="page"]{
+  z-index:2;margin-top:0;padding-top:17px;min-height:57px;
+  background:var(--paper);color:var(--ink);font-weight:800;
+  box-shadow:0 3px 4px rgba(0,0,0,.4);
+}
+nav.tabs button[aria-current="page"]::after{content:"";position:absolute;left:30%;right:30%;bottom:7px;border-top:2px solid var(--rubric)}
+.badge{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:9px;background:var(--rubric);color:#fff;font-size:11px;font-weight:600;padding:0 4px;text-align:center}
+nav.tabs .badge{position:absolute;top:3px;right:3px}
+nav.tabs button[aria-current="page"] .badge{top:10px}
+
+/* 本日の帳簿（折りたたみ） */
+details.sheet > summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;min-height:44px;margin:-8px 0}
+details.sheet > summary::-webkit-details-marker{display:none}
+details.sheet > summary h2{margin:0}
+details.sheet > summary::after{content:"▸";color:var(--ink-soft);font-size:14px;transition:transform .15s}
+details.sheet[open] > summary{margin-bottom:4px}
+details.sheet[open] > summary::after{transform:rotate(90deg)}
+
+/* 倉庫と相場：品ごとの売る数 */
+.ware{padding:10px 0;border-bottom:1px solid var(--line)}
+.ware:last-child{border-bottom:0}
+.ware-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.ware-head .name{font-weight:800}
+.ware-ctl{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px}
+.ware-ctl .btn{min-height:44px;min-width:44px;padding:4px 10px}
+.ware-ctl .qty-n{min-width:30px;text-align:center;font-weight:600;font-size:18px}
+.ware-ctl .sell{margin-left:auto;min-width:64px}
+.ware .muted{line-height:1.5}
+.ware-head .quote{font-size:14px;white-space:nowrap}
+.ware-head .quote b{font-size:17px}
 
 /* 知らせ */
 #toast{
@@ -289,7 +329,7 @@ function startTrust(){ return S.rep >= CONFIG.repTrustHigh ? 4 : S.rep <= CONFIG
 
 /* ===== 状態 ===== */
 let S = null;
-let UI = {tab:'home', showCode:false};
+let UI = {tab:'home', showCode:false, ledgerOpen:false, sellQty:{}};
 
 function planFor(a){
   a.plan = {days: rand(2,3), advance: Math.max(5, CONFIG.advanceBase + a.skill*CONFIG.advancePerSkill + dealOf(a).adv)};
@@ -490,12 +530,22 @@ function refuse(oid){
   toast('破談にしました。');
   commit();
 }
-function sell(k, all){
+/* n個を卸したときの受取額と、卸した後の相場（値下がり込み）。売る前の見積もりと実際の売却で同じ計算を使う */
+function sellQuote(k, n){
+  let p = S.market[k].price, got = 0;
+  for (let i=0;i<n;i++){ got += Math.max(1, Math.round(p)); p *= (1 - CONFIG.priceImpact); }
+  return {got, after:p};
+}
+/* 売る数の指定（画面だけの状態。在庫の範囲に収める） */
+function sellQty(k){ return clamp(UI.sellQty[k] || 1, 1, Math.max(1, S.inventory[k] || 0)); }
+function setSellQty(k, n){ UI.sellQty[k] = clamp(n, 1, Math.max(1, S.inventory[k] || 0)); render(); }
+function sell(k, count){
   const have = S.inventory[k] || 0; if (!have) return;
-  const n = all ? have : 1;
-  let got = 0;
-  for (let i=0;i<n;i++){ got += price(k); S.market[k].price *= (1 - CONFIG.priceImpact); }
+  const n = clamp(count, 1, have);
+  const {got, after} = sellQuote(k, n);
+  S.market[k].price = after;
   S.inventory[k] -= n; S.gold += got; S.stats.sold += got;
+  delete UI.sellQty[k];
   log(`${ITEMS[k].name}×${n}を市場へ卸した。`, got);
   toast(`${ITEMS[k].name}×${n}を${got}枚で売りました。`);
   commit();
@@ -587,9 +637,9 @@ function viewHome(){
   h += S.rumors.length ? S.rumors.map(r => `<div class="row"><span>${r.text}</span><span class="muted">第${r.day}日</span></div>`).join('') : `<p class="muted">目立った噂はありません。</p>`;
   h += `</section>`;
 
-  h += `<section class="sheet"><h2>本日の帳簿</h2>`;
+  h += `<details class="sheet" id="ledger" ${UI.ledgerOpen?'open':''}><summary><h2>本日の帳簿（${S.ledger.length}件）</h2></summary>`;
   h += S.ledger.length ? S.ledger.map(l => `<div class="row"><span>${l.text}</span>${l.v?`<span class="num ${l.v>0?'plus':'minus'}">${l.v>0?'+':'−'}${Math.abs(l.v)}</span>`:''}</div>`).join('') : `<p class="muted">今日はまだ記帳がありません。</p>`;
-  h += `</section>`;
+  h += `</details>`;
 
   if (!S.debt.paid){
     h += `<section class="sheet"><h2>借金</h2>
@@ -630,12 +680,24 @@ function viewMarket(){
     total += p*have;
     const diff = p - prev;
     const mark = diff > 0 ? `<span class="up">▲${diff}</span>` : diff < 0 ? `<span class="down">▼${-diff}</span>` : '';
-    rows += `<tr><td>${ITEMS[k].name}</td><td class="r">${have}</td><td class="r"><span class="num">${p}</span> ${mark}</td>
-      <td><div class="sellbtns"><button class="btn small" data-act="sell1" data-v="${k}" ${have?'':'disabled'}>1つ</button><button class="btn small" data-act="sellall" data-v="${k}" ${have?'':'disabled'}>全部</button></div></td></tr>`;
+    const n = sellQty(k);
+    rows += `<div class="ware">
+      <div class="ware-head"><span class="name">${ITEMS[k].name}</span>${have?`<span class="quote">${n}つで <b>${sellQuote(k, n).got}</b>枚</span>`:''}</div>
+      <div class="muted">在庫 <span class="num">${have}</span>　相場 <span class="num">${p}</span>枚 ${mark}</div>`;
+    if (have){
+      rows += `<div class="ware-ctl">
+        <button class="btn" data-act="qtydown" data-v="${k}" aria-label="${ITEMS[k].name}の売る数を1つ減らす" ${n<=1?'disabled':''}>−</button>
+        <span class="qty-n">${n}</span>
+        <button class="btn" data-act="qtyup" data-v="${k}" aria-label="${ITEMS[k].name}の売る数を1つ増やす" ${n>=have?'disabled':''}>＋</button>
+        <button class="btn" data-act="qtyall" data-v="${k}" ${n>=have?'disabled':''}>全部</button>
+        <button class="btn solid sell" data-act="sell" data-v="${k}">売る</button>
+      </div>`;
+    }
+    rows += `</div>`;
   }
   return `<section class="sheet"><h2>倉庫と相場</h2>
-    <p class="muted">一度に多く卸すと値が下がります。値は日をまたぐと少しずつ戻ります。▲▼は前日との差です。</p>
-    <div class="table-wrap"><table><thead><tr><th>品</th><th class="r">在庫</th><th class="r">相場</th><th class="r">卸す</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="muted">一度に多く卸すと値が下がります（見積もりは値下がり込み）。値は日をまたぐと少しずつ戻ります。▲▼は前日との差です。</p>
+    ${rows}
     <p style="margin-top:10px">在庫の相場換算：<span class="num">${total}</span>枚</p></section>`;
 }
 function viewReports(){
@@ -723,8 +785,10 @@ document.addEventListener('click', e => {
     case 'accept': accept(+v); break;
     case 'haggle': haggle(+v); break;
     case 'refuse': refuse(+v); break;
-    case 'sell1': sell(v, false); break;
-    case 'sellall': sell(v, true); break;
+    case 'qtydown': setSellQty(v, sellQty(v) - 1); break;
+    case 'qtyup': setSellQty(v, sellQty(v) + 1); break;
+    case 'qtyall': setSellQty(v, S.inventory[v] || 1); break;
+    case 'sell': sell(v, sellQty(v)); break;
     case 'pay': payDebt(); break;
     case 'endday': endDay(); break;
     case 'freeplay': S.freePlay = true; S.over = null; commit(); break;
@@ -753,6 +817,8 @@ document.addEventListener('click', e => {
     }
   }
 });
+// 本日の帳簿の開閉は、描き直しても保つ（toggle は伝わらないので捕捉段階で拾う）
+document.addEventListener('toggle', e => { if (e.target.id === 'ledger') UI.ledgerOpen = e.target.open; }, true);
 document.addEventListener('change', e => {
   if (e.target.id !== 'filein' || !e.target.files[0]) return;
   const r = new FileReader();
@@ -769,6 +835,8 @@ document.addEventListener('change', e => {
    指を動かした操作（スクロール）や2本指（ピンチ拡大）、文字欄の中の操作には手を出さず、
    それらの直後のタップも二度目とは数えない（スクロールを止めるタップで釦が押されないように）。 */
 const DOUBLE_TAP_MS = 350, TAP_SLOP_PX = 10;
+// 押し直す対象。summary＝本日の帳簿の開閉、[data-act]＝付箋・売る数の−／＋・全部・売る などの釦
+const RETAP_TARGETS = 'button,label,a,summary,[data-act]';
 let lastTouchEnd = -Infinity, touchMoved = false, touchX = 0, touchY = 0;
 document.addEventListener('touchstart', e => {
   touchMoved = e.touches.length > 1;
@@ -785,7 +853,14 @@ document.addEventListener('touchend', e => {
   const now = performance.now();
   if (now - lastTouchEnd < DOUBLE_TAP_MS) {
     e.preventDefault();
-    const c = t.closest && t.closest('button,label,a,[data-act]');
+    let c = t.closest && t.closest(RETAP_TARGETS);
+    // 一度目の押下で画面が描き直されると、指の下の釦は新しいものに置き換わっている。
+    // 古い釦（画面から外れたもの）を押しても何も起きないので、指の位置にある今の部品を押す
+    if (!c || !c.isConnected){
+      const p = e.changedTouches[0];
+      const now_el = p && document.elementFromPoint(p.clientX, p.clientY);
+      c = now_el && now_el.closest(RETAP_TARGETS);
+    }
     if (c) c.click();
   }
   lastTouchEnd = now;  // 三度目以降の素早いタップも続けて打ち消す
