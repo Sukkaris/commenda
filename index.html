@@ -162,12 +162,13 @@ nav.tabs button{
   font-size:12.5px;line-height:1.3;letter-spacing:-.02em;white-space:nowrap;cursor:pointer;
   box-shadow:inset 0 7px 6px -5px rgba(0,0,0,.35),0 2px 3px rgba(0,0,0,.35);
 }
-/* 付箋ごとの色味（配色表の羅紗・紙・墨・朱・金の範囲で） */
-nav.tabs button[data-v="home"]{--tab:color-mix(in srgb,var(--paper-2) 84%,var(--rubric))}
-nav.tabs button[data-v="tavern"]{--tab:color-mix(in srgb,var(--paper-2) 80%,var(--gilt))}
-nav.tabs button[data-v="market"]{--tab:color-mix(in srgb,var(--paper-2) 82%,var(--ok))}
-nav.tabs button[data-v="reports"]{--tab:color-mix(in srgb,var(--paper-2) 86%,var(--ink))}
-nav.tabs button[data-v="settings"]{--tab:var(--paper-2)}
+/* 付箋ごとの色味（配色表の羅紗・紙・墨・朱・金の範囲で）。色を混ぜられない古いiPhoneでは無地の紙色のまま */
+@supports (background:color-mix(in srgb,red,blue)){
+  nav.tabs button[data-v="home"]{--tab:color-mix(in srgb,var(--paper-2) 84%,var(--rubric))}
+  nav.tabs button[data-v="tavern"]{--tab:color-mix(in srgb,var(--paper-2) 80%,var(--gilt))}
+  nav.tabs button[data-v="market"]{--tab:color-mix(in srgb,var(--paper-2) 82%,var(--ok))}
+  nav.tabs button[data-v="reports"]{--tab:color-mix(in srgb,var(--paper-2) 86%,var(--ink))}
+}
 /* 開いている付箋は紙面とつながって見える（帯の上に重ねて継ぎ目を消す） */
 nav.tabs button[aria-current="page"]{
   z-index:2;margin-top:0;padding-top:17px;min-height:57px;
@@ -226,7 +227,7 @@ textarea{width:100%;min-height:90px;font:13px/1.5 ui-monospace,Menlo,monospace;b
 
 <script>
 'use strict';
-const VERSION = 'v0.1.3';
+const VERSION = 'v0.2.0';
 const SAVE_KEY = 'commenda-save';
 const SAVE_VER = 2;  // 保存データの形の版。変えたら migrate() に変換を足す
 
@@ -255,9 +256,11 @@ const CONFIG = {
   repHaggleWin: -1,      // 値切りに成功したとき
   repHaggleLose: -4,     // 値切りに失敗したとき
   repRefuse: -2,         // 買取を断った・返事をせずに破談にしたとき
-  repHaggleDiv: 100,     // 値切り成功率に (評判−50)÷この値 を加える
-  repTrustHigh: 70,      // 評判がこれ以上なら、新顔の初期の信頼は4
-  repTrustLow: 30        // 評判がこれ以下なら、新顔の初期の信頼は2（それ以外は3）
+  repNeutral: 50,        // 値切り成功率に効かない評判（これより上なら有利、下なら不利）
+  repHaggleDiv: 100,     // 値切り成功率に (評判−repNeutral)÷この値 を加える
+  repTrustHigh: 70,      // 評判がこれ以上なら、新顔の初期の信頼は trustByRep.high
+  repTrustLow: 30,       // 評判がこれ以下なら、新顔の初期の信頼は trustByRep.low
+  trustByRep: {high:4, mid:3, low:2}
 };
 /* 評判の表示（下限の値と語） */
 const REP_WORDS = [[80,'名声'],[60,'好評'],[40,'無名'],[20,'不評'],[0,'悪名']];
@@ -325,7 +328,7 @@ const dealOf = a => TRAITS.deal[a.deal];
 const traitText = a => `${a.explore}、${a.deal}`;  // 主人公の人物評（二語のみ）
 const repWord = () => REP_WORDS.find(([min]) => S.rep >= min)[1];
 function addRep(d){ S.rep = clamp(S.rep + d, 0, 100); }
-function startTrust(){ return S.rep >= CONFIG.repTrustHigh ? 4 : S.rep <= CONFIG.repTrustLow ? 2 : 3; }
+function startTrust(){ const t = CONFIG.trustByRep; return S.rep >= CONFIG.repTrustHigh ? t.high : S.rep <= CONFIG.repTrustLow ? t.low : t.mid; }
 
 /* ===== 状態 ===== */
 let S = null;
@@ -355,6 +358,7 @@ function newGame(){
     S.inventory[k] = 0;
   }
   for (let i=0;i<CONFIG.tavernStart;i++) S.adventurers.push(newAdventurer());
+  UI.sellQty = {};
   log('借入金を元手に帳場を開いた。', 0);
 }
 function log(text, v){ S.ledger.push({text, v}); }
@@ -373,29 +377,49 @@ function migrate(o){
     o.ver = 2;
   }
   if (o.ver !== SAVE_VER) return null;
+  // 欠けた欄を補う（試作中の版で書かれたデータなどに備える）
+  if (typeof o.rep !== 'number' || !isFinite(o.rep)) o.rep = CONFIG.repStart;
+  for (const a of o.adventurers){
+    if (!TRAITS.explore[a.explore]) a.explore = '慎重';
+    if (!TRAITS.deal[a.deal]) a.deal = '正直';
+    delete a.trait;
+  }
   return o;
+}
+/* 読み込んだデータで実際に画面が描けるか確かめる。描けなければ元の状態に戻して失敗を返す */
+function tryAdopt(o){
+  const prev = S;
+  S = o;
+  try {
+    for (const view of [viewHome, viewTavern, viewMarket, viewReports]) view();  // どの画面も描けるか
+    render(); return true;
+  }
+  catch(e){ S = prev; return false; }
 }
 function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
 function load(){
   try{
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return false;
-    let o = null;
-    try{ o = migrate(JSON.parse(raw)); }catch(e){}
-    if (!o){
+    let o = null, oldVer = null;
+    try{ const parsed = JSON.parse(raw); oldVer = parsed && parsed.ver; o = migrate(parsed); }catch(e){}
+    if (!o || !tryAdopt(o)){
       // 読めなかった保存データは、新しい帳場で上書きする前に別の名前で取っておく
       localStorage.setItem(SAVE_KEY + '-unreadable', raw);
       return false;
     }
-    S = o; save(); return true;
+    // 古い形から直したときは、直す前のデータを版ごとに一度だけ取っておく
+    if (oldVer !== SAVE_VER && !localStorage.getItem(SAVE_KEY + '-v' + oldVer)) localStorage.setItem(SAVE_KEY + '-v' + oldVer, raw);
+    save(); return true;
   }catch(e){ return false; }
 }
 function exportCode(){ return btoa(unescape(encodeURIComponent(JSON.stringify(S)))); }
 function importText(text){
   const t = text.trim();
   const o = migrate(t.startsWith('{') ? JSON.parse(t) : JSON.parse(decodeURIComponent(escape(atob(t)))));
-  if (!o) throw new Error('bad');
-  S = o; save(); render();
+  if (!o || !tryAdopt(o)) throw new Error('bad');
+  UI.sellQty = {};
+  save(); render();
 }
 
 /* ===== 相場 ===== */
@@ -503,7 +527,7 @@ function accept(oid){
   commit();
 }
 function haggleChance(a){
-  return clamp(dealOf(a).haggle + (a.trust-3)*CONFIG.haggleTrustStep + (S.rep-50)/CONFIG.repHaggleDiv, 0.05, 0.9);
+  return clamp(dealOf(a).haggle + (a.trust-3)*CONFIG.haggleTrustStep + (S.rep-CONFIG.repNeutral)/CONFIG.repHaggleDiv, 0.05, 0.9);
 }
 function haggle(oid){
   const o = S.offers.find(x => x.id === oid); if (!o || o.haggled) return;
@@ -732,7 +756,7 @@ function viewSettings(){
   <section class="sheet"><h2>この遊戯について</h2>
     <div class="row"><span>題名</span><span>Commenda: Delve &amp; Dividend</span></div>
     <div class="row"><span>版</span><span class="num">${VERSION}</span></div>
-    <div class="row"><span>段階</span><span>試作（技術検証）</span></div>
+    <div class="row"><span>段階</span><span>開発途中（第一版へ向けて）</span></div>
   </section>`;
 }
 function renderOverlay(){
@@ -744,7 +768,7 @@ function renderOverlay(){
       <div class="row"><span>買い取りの総額</span><span class="num">${S.stats.bought}枚</span></div>
       <div class="row"><span>売り上げの総額</span><span class="num">${S.stats.sold}枚</span></div>
       <div class="row"><span>手元に残った銀貨</span><span class="num">${S.gold}枚</span></div>
-      <p class="muted" style="margin-top:8px">試作はここまでです。続けて商いを試すこともできます。</p>
+      <p class="muted" style="margin-top:8px">開発途中の版はここまでです。続けて商いを試すこともできます。</p>
       <div class="btns"><button class="btn solid" data-act="freeplay">続けて商う</button><button class="btn" data-act="newgame">最初から</button></div>
     </section></div>`;
   } else if (S.over === 'lose'){
@@ -774,11 +798,18 @@ function toast(msg){
    素早い二度押しで2日進んだり、終幕画面を見る前に「最初から」が押されたりするのを防ぐ。 */
 const SEAL_GUARD_MS = 700, SEAL_GUARDED = ['endday', 'newgame', 'freeplay'];
 let lastSealAt = -Infinity;
+const SELL_GUARD_MS = 700;
+let lastSellAt = -Infinity, lastSellKey = null;
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
   const v = b.dataset.v, act = b.dataset.act;
   if (SEAL_GUARDED.includes(act) && performance.now() - lastSealAt < SEAL_GUARD_MS) return;
   if (act === 'endday' || act === 'pay') lastSealAt = performance.now();
+  // 売るの素早い二度押しで、意図せず追加で売ってしまわないようにする
+  if (act === 'sell'){
+    if (v === lastSellKey && performance.now() - lastSellAt < SELL_GUARD_MS) return;
+    lastSellAt = performance.now(); lastSellKey = v;
+  }
   switch (act){
     case 'tab': UI.tab = v; UI.showCode = false; render(); window.scrollTo(0,0); break;
     case 'hire': hire(+v); break;
@@ -853,14 +884,8 @@ document.addEventListener('touchend', e => {
   const now = performance.now();
   if (now - lastTouchEnd < DOUBLE_TAP_MS) {
     e.preventDefault();
-    let c = t.closest && t.closest(RETAP_TARGETS);
-    // 一度目の押下で画面が描き直されると、指の下の釦は新しいものに置き換わっている。
-    // 古い釦（画面から外れたもの）を押しても何も起きないので、指の位置にある今の部品を押す
-    if (!c || !c.isConnected){
-      const p = e.changedTouches[0];
-      const now_el = p && document.elementFromPoint(p.clientX, p.clientY);
-      c = now_el && now_el.closest(RETAP_TARGETS);
-    }
+    // 一度目の押下で画面が描き直されても、二度目のタップはその後に始まるので新しい釦に当たる
+    const c = t.closest && t.closest(RETAP_TARGETS);
     if (c) c.click();
   }
   lastTouchEnd = now;  // 三度目以降の素早いタップも続けて打ち消す
