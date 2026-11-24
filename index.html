@@ -184,7 +184,7 @@ textarea{width:100%;min-height:90px;font:13px/1.5 ui-monospace,Menlo,monospace;b
 
 <script>
 'use strict';
-const VERSION = 'v0.1.2';
+const VERSION = 'v0.1.3';
 const SAVE_KEY = 'commenda-save';
 
 /* ===== 調整用の数値（遊び心地を見ながらここを変える） ===== */
@@ -647,9 +647,15 @@ function toast(msg){
 }
 
 /* ===== 操作 ===== */
+/* 一日を締める／返済のすぐ後の押下は、締めと終幕画面の釦に限って受け付けない。
+   素早い二度押しで2日進んだり、終幕画面を見る前に「最初から」が押されたりするのを防ぐ。 */
+const SEAL_GUARD_MS = 700, SEAL_GUARDED = ['endday', 'newgame', 'freeplay'];
+let lastSealAt = -Infinity;
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
   const v = b.dataset.v, act = b.dataset.act;
+  if (SEAL_GUARDED.includes(act) && performance.now() - lastSealAt < SEAL_GUARD_MS) return;
+  if (act === 'endday' || act === 'pay') lastSealAt = performance.now();
   switch (act){
     case 'tab': UI.tab = v; UI.showCode = false; render(); window.scrollTo(0,0); break;
     case 'hire': hire(+v); break;
@@ -702,7 +708,7 @@ document.addEventListener('change', e => {
    指を動かした操作（スクロール）や2本指（ピンチ拡大）、文字欄の中の操作には手を出さず、
    それらの直後のタップも二度目とは数えない（スクロールを止めるタップで釦が押されないように）。 */
 const DOUBLE_TAP_MS = 350, TAP_SLOP_PX = 10;
-let lastTouchEnd = 0, touchMoved = false, touchX = 0, touchY = 0;
+let lastTouchEnd = -Infinity, touchMoved = false, touchX = 0, touchY = 0;
 document.addEventListener('touchstart', e => {
   touchMoved = e.touches.length > 1;
   if (!touchMoved) { touchX = e.touches[0].clientX; touchY = e.touches[0].clientY; }
@@ -714,8 +720,8 @@ document.addEventListener('touchmove', e => {
 document.addEventListener('touchend', e => {
   const t = e.target;
   const inField = t.closest && t.closest('input,textarea,select');
-  if (touchMoved || e.touches.length > 0 || inField) { lastTouchEnd = 0; return; }
-  const now = Date.now();
+  if (touchMoved || e.touches.length > 0 || inField) { lastTouchEnd = -Infinity; return; }
+  const now = performance.now();
   if (now - lastTouchEnd < DOUBLE_TAP_MS) {
     e.preventDefault();
     const c = t.closest && t.closest('button,label,a,[data-act]');
